@@ -12,7 +12,7 @@ const commands = [
                 type: 3,
                 required: true
             }
-        ]
+        ],
     },
 ];
 
