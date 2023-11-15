@@ -1,18 +1,45 @@
 import { REST, Routes } from 'discord.js';
 import "dotenv/config";
 
+// NOTE TO SELF:
+// COMMAND NAMES AND DERIVATIVES CANNOT CONTAIN HIGH CASE LETTERS
+
 const commands = [
+    // {
+    //     name: 'register',
+    //     description: 'Register your email so you can download the game',
+    //     options: [
+    //         {
+    //             name: 'email',
+    //             description: 'The email you want to play with',
+    //             type: 3,
+    //             required: true
+    //         }
+    //     ],
+    // },
     {
-        name: 'register',
-        description: 'Register your email so you can download the game',
+        name: 'migrate',
+        description: 'Migrate your account from the old server to the new one',
+        type: 1,
         options: [
             {
-                name: 'email',
-                description: 'The email you want to play with',
+                name: 'platform',
+                description: 'The platform you play on',
                 type: 3,
-                required: true
+                required: true,
+                choices: [
+                    {
+                        name: 'IOS',
+                        value: 'ios'
+                    },
+                    {
+                        name: 'Android',
+                        value: 'android'
+                    }
+                ],
             }
-        ],
+        ]
+
     },
 ];
 

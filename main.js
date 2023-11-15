@@ -1,5 +1,7 @@
-import {Client, GatewayIntentBits} from 'discord.js';
+import {Client, Events, GatewayIntentBits} from 'discord.js';
 import "dotenv/config";
+import {checks} from "./checks.js";
+import {logger} from "./logger.js";
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 client.on('ready', () => {
@@ -8,62 +10,81 @@ client.on('ready', () => {
 
 
 
-client.on('interactionCreate', async interaction => {
-
-    const regexExp = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/gi;
-
-    if (!interaction.isChatInputCommand()) {
-        await interaction.reply('This is not a command');
-        console.log(`User <@${interaction.user.id}> tried to use a command in a non-command context`);
-        return;
-    }
-
-    if (interaction.guild === null) {
-        await interaction.reply({content: 'You can only register in <#1158452522453839922>', ephemeral: true});
-        // Log the attempt to log channel on discord
-        await client.channels.cache.get('1158458871942221964').send(`User <@${interaction.user.id}> tried to use a command in a DM`)
-        console.log(`User ${interaction.user.tag} tried to register in a DM`);
-        return;
-    }
-
-
-    if (interaction.channelId !== process.env.ALLOWED_CHANNELS)  {
-        await interaction.reply({ content: 'You can only register in <#1158452522453839922>', ephemeral: true });
-        // Log the attempt to log channel on discord
-        await client.channels.cache.get('1158458871942221964').send(`User <@${interaction.user.id}> tried to use a command in <#${interaction.channel.id}>`)
-        console.log(`User ${interaction.user.tag} tried to register in <#${interaction.channel.id}>`);
-        return;
-    }
-
-    if (!regexExp.test(interaction.options.getString('email'))) {
-        await interaction.reply({ content: 'Please provide a valid email', ephemeral: true });
-        // Log the invalid email on discord
-        await client.channels.cache.get('1158458871942221964').send(`User <@${interaction.user.id}> provided an invalid email: ${interaction.options.getString('email')}`)
-        console.log(`User ${interaction.user.tag} provided an invalid email`);
-        return;
-    }
-
+client.on(Events.InteractionCreate, async interaction => {
     try {
-        await interaction.reply({ content: 'Email registered!, please be patient and read the faq in <#1158394883581681715>', ephemeral: true });
-        // Send valid email to discord channel
-        await client.channels.cache.get(`1158420375932252282`).send(`<@${interaction.user.id}> has registered ${interaction.options.getString('email')}`);
-        console.log(`User ${interaction.user.tag} has registered ${interaction.options.getString('email')}`);
+        // Check basic stuff
+        const check_passed = await checks(interaction);
+        if (check_passed === false) return;
+
+        // Handle command
+        const user = interaction.user;
+        const user_id = user.id
+        const platform = interaction.options.getString('platform');
+        const main_server = client.guilds.cache.get('351392315870543872')
+
+        console.log(`User ${user_id} wants to migrate their account to ${platform}`);
+
+        // check if user has admin perms
+        if (interaction.member.permissions.has('ADMINISTRATOR')) {
+            logger(`User <@${user_id}> tried to migrate but is an admin`, client)
+            await interaction.reply({content: 'admins not allowed, gtfo', ephemeral: true});
+            return
+        }
+
+
+        // Check if user is in main server
+        let user_on_main;
+        try {
+            user_on_main = await main_server.members.fetch(user_id)
+        } catch (error) {
+            await interaction.reply({content: 'You are not in the main server', ephemeral: true});
+            return
+        }
+
+        // Check if user has android or ios role, meaning they are already registered
+        //  Tester role can register again to claim platform role
+        if (user_on_main.roles.cache.has('1174364579149643776') || user_on_main.roles.cache.has('1174364513433288745')) {
+            await interaction.reply({content: 'You are already registered', ephemeral: true});
+            return
+        }
+
+        // Assign roles according to platform and tester role
+        switch (platform) {
+            case "ios":
+                await user_on_main.roles.add(['1174364579149643776', '1140598121131413506'])
+                break;
+            case "android":
+                await user_on_main.roles.add(['1174364513433288745', '1140598121131413506'])
+                break;
+        }
+
+
+        // Send message to user
+        main_server.channels.cache.get('1174407911619952640').send(`Hey <@${user_id}>! This is the new test zone, so you will be removed from the old test server. Enjoy!`)
+        await interaction.reply({
+            content: 'Migration completed, you will be removed from this server in 5 seconds',
+            ephemeral: true
+        });
+
+        // Kick user from test server
+        setTimeout(() => {
+            interaction.guild.members.kick(user_id)
+            logger(`User <@${user_id}> migrated. Platform: ${platform}`, client)
+        }, 5000)
 
     } catch (error) {
-        await interaction.reply({message: 'There was an error while registering your email, please try again later', ephemeral: true});
-        // Log the error on discord
-        await client.channels.cache.get('1158458871942221964').send(`error while registering email for user <@${interaction.user.id}>`)
-        console.error(error);
+        try {
+            await interaction.reply({content: 'Something went wrong, please contact an admin', ephemeral: true});
+        } catch (error) {
+            logger(`Error: ${error}`, client)
+        }
+        logger(`Error: ${error}`, client)
     }
+
 });
 
 client.on('error', async error => {
-    try {
-        await client.channels.cache.get(`1158458871942221964`).send(`Try again fucko, this did not solve the problem`)
-    } catch (error) {
-        console.log("error while reporting error")
-    }
-    console.error(error);
+    logger(`Error: ${error}`, client)
 })
 
 
