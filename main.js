@@ -1,4 +1,4 @@
-import {Client, Events, GatewayIntentBits} from 'discord.js';
+import {Client, Events, GatewayIntentBits, PermissionsBitField} from 'discord.js';
 import "dotenv/config";
 import {checks} from "./checks.js";
 import {logger} from "./logger.js";
@@ -22,10 +22,10 @@ client.on(Events.InteractionCreate, async interaction => {
         const platform = interaction.options.getString('platform');
         const main_server = client.guilds.cache.get('351392315870543872')
 
-        console.log(`User ${user_id} wants to migrate their account to ${platform}`);
+        console.log(`User ${user.tag} wants to migrate their account to ${platform}`);
 
         // check if user has admin perms
-        if (interaction.member.permissions.has('ADMINISTRATOR')) {
+        if (interaction.member.permissionsIn(interaction.channel).has(PermissionsBitField.Flags.Administrator)) {
             logger(`User <@${user_id}> tried to migrate but is an admin`, client)
             await interaction.reply({content: 'admins not allowed, gtfo', ephemeral: true});
             return
